@@ -43,7 +43,8 @@ export type ResolvedConfig = Required<Config>
 /** Schemastery config exposed by the plugin. */
 export const Config: z<Config> = z.object({
   backendType: z.string().default('shell'),
-  shellPath: z.string().default('/bin/bash'),
+  // openharmony port: no /bin/bash on HarmonyOS; HNP bash at /data/service/hnp/bin/bash (already on PATH)
+  shellPath: z.string().default('/data/service/hnp/bin/bash'),
   shellArgs: z.array(z.string()).default(['--noprofile', '--norc', '-i']),
   rows: z.number().default(40),
   cols: z.number().default(160),
