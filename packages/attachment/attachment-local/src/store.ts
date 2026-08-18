@@ -2,7 +2,7 @@
 
 import { createHash, randomUUID } from 'node:crypto'
 import { constants } from 'node:fs'
-import { chmod, link, mkdir, open, readFile, unlink } from 'node:fs/promises'
+import { chmod, mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import { dirname, join, parse, resolve } from 'node:path'
 import {
   AttachmentError,
@@ -155,7 +155,8 @@ export async function saveImageFile(root: string, input: SaveImageAttachment, li
     await handle.close()
     handle = undefined
     try {
-      await link(temporary, target)
+      // openharmony port: linkat() forbidden (EPERM) -> rename(), same-dir atomic
+      await rename(temporary, target)
     } catch (error) {
       /* v8 ignore next -- Private same-filesystem directories make EEXIST the only recoverable link race. */
       if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) throw error
