@@ -9,7 +9,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { readdirSync } from 'node:fs'
-import { open, mkdir, readFile, readdir, realpath, link, rm, stat, truncate } from 'node:fs/promises'
+import { open, mkdir, readFile, readdir, realpath, rename, rm, stat, truncate } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { scheduler } from 'node:timers/promises'
@@ -541,12 +541,12 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     await this.syncDirPosix(project)
     await this.rejectExistingLog(finalPath, id)
     const tmp = await this.writeSyncedTempFile(finalPath, content)
-    // Publish via link()+unlink(), NOT rename(): link fails with EEXIST if the
-    // final path already exists, so two processes materializing the same id
-    // concurrently cannot clobber each other. rename() would silently overwrite.
+    // openharmony port: linkat() is forbidden (EPERM) on this platform, so publish
+    // via rename() — same-directory rename is equally atomic. rejectExistingLog
+    // above still guards concurrent materialization of the same id.
     let linked = false
     try {
-      await link(tmp, finalPath)
+      await rename(tmp, finalPath)
       linked = true
     } finally {
       // Remove an unpublished temp on failure. After publication, defer cleanup
@@ -554,7 +554,7 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
       /* v8 ignore next -- link failure is the TOCTOU/IO race guarded above; not reachable in test */
       if (!linked) await rm(tmp, { force: true })
     }
-    // link() succeeded — the log is published. fsync the directory so the new
+    // publish succeeded — the log is durable. fsync the directory so the new
     // entry survives a power loss: the new link is not crash-durable until the
     // parent directory's metadata is synced.
     await this.syncDirPosix(dir)
